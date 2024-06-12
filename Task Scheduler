@@ -1,0 +1,151 @@
+import tkinter as tk
+from tkinter import messagebox
+import schedule
+import time
+import pickle
+
+
+backups = []
+
+def save_backups():
+    with open('backups.pickle', 'wb') as f:
+        pickle.dump(backups, f)
+
+def load_backups():
+    global backups
+    try:
+        with open('backups.pickle', 'rb') as f:
+            backups = pickle.load(f)
+    except FileNotFoundError:
+        backups = []
+
+load_backups()
+
+def run_task(task_name):
+    messagebox.showinfo("Выполнение задачи", f"Выполняется задача: {task_name}")
+
+def start():
+    schedule.run_pending()
+    root.after(1000, start)
+
+def set_task():
+    task_time = entry_time.get()
+    task_name = entry_task.get()
+    repeat_time = entry_repeat.get() if entry_repeat.get() else None
+
+    if repeat_time:
+        days, hours, minutes = repeat_time.split(':')
+        schedule.every().day.at(task_time).do(run_task, task_name)
+        schedule.every().day.at(task_time).do(run_task, task_name).tag('repeat').every(int(days)).days
+        schedule.every().day.at(task_time).do(run_task, task_name).tag('repeat').every(int(hours)).hours
+        schedule.every().day.at(task_time, "").do(run_task, task_name).tag('repeat').every(int(minutes)).minutes
+        start()
+
+    else:
+        schedule.every().day.at(task_time).do(run_task, task_name)
+        start()
+
+    task_info = {'time': task_time, 'name': task_name, 'repeat': repeat_time}
+    backups.append(task_info)
+    save_backups()
+
+    entry_time.delete(0, tk.END)
+    entry_task.delete(0, tk.END)
+
+    messagebox.showinfo("Успех", "Задача успешно запланирована")
+
+
+
+def view_all_tasks():
+    tasks = [f"Время: {task['time']}, Задача: {task['name']}, Периодичность: {task.get('repeat', 'Нет')}" for task in backups]
+    messagebox.showinfo("Список задач", "\n".join(tasks))
+
+def clear_all_tasks():
+    schedule.clear()
+    backups.clear()
+    save_backups()
+    messagebox.showinfo("Результат", "Все задачи удалены")
+
+def update_current_tasks():
+    listbox_tasks.delete(0, tk.END)
+    for task in backups:
+        listbox_tasks.insert(tk.END, f"Время: {task['time']}, Задача: {task['name']}, Периодичность: {task.get('repeat', 'Нет')}")
+
+def edit_task():
+    selected_task = listbox_tasks.curselection()
+    if len(selected_task) == 1:
+        task_index = selected_task[0]
+        updated_time = entry_time.get()
+        updated_name = entry_task.get()
+        updated_repeat = entry_repeat.get()
+
+        task_info = backups[task_index]
+        task_info['time'] = updated_time
+        task_info['name'] = updated_name
+        task_info['repeat'] = updated_repeat
+
+        backups[task_index] = task_info
+        save_backups()
+        update_current_tasks()
+        messagebox.showinfo("Успех", "Задача успешно отредактирована")
+    else:
+        messagebox.showerror("Ошибка", "Пожалуйста, выберите одну задачу для редактирования")
+
+def delete_task():
+    selected_task = listbox_tasks.curselection()
+    if len(selected_task) == 1:
+        task_index = selected_task[0]
+
+        del backups[task_index]
+        save_backups()
+        messagebox.showinfo("Успех", "Задача успешно удалена")
+    else:
+        messagebox.showerror("Ошибка", "Пожалуйста, выберите одну задачу для удаления")
+
+
+
+root = tk.Tk()
+root.title("Планировщик задач")
+
+label_time = tk.Label(root, text="Время задачи (чч:мм):")
+label_time.pack()
+
+entry_time = tk.Entry(root)
+entry_time.pack()
+
+label_task = tk.Label(root, text="Название задачи:")
+label_task.pack()
+
+entry_task = tk.Entry(root)
+entry_task.pack()
+
+button_set_task = tk.Button(root, text="Запланировать задачу", command=set_task)
+button_set_task.pack()
+
+button_view_tasks = tk.Button(root, text="Показать все задачи", command=view_all_tasks)
+button_view_tasks.pack()
+
+button_update_current_tasks = tk.Button(root, text="Обновить список задач", command=update_current_tasks)
+button_update_current_tasks.pack()
+
+button_clear_tasks = tk.Button(root, text="Очистить все задачи", command=clear_all_tasks)
+button_clear_tasks.pack()
+
+label_tasks = tk.Label(root, text="Список задач:")
+label_tasks.pack()
+listbox_tasks = tk.Listbox(root, width=60)
+listbox_tasks.pack()
+
+button_edit_current_task = tk.Button(root, text="Редактировать выбранную задачу", command=edit_task)
+button_edit_current_task.pack()
+
+label_repeat = tk.Label(root, text="Повторять каждые (дней:часы:минуты):")
+label_repeat.pack()
+
+entry_repeat = tk.Entry(root)
+entry_repeat.pack()
+
+button_delete_task = tk.Button(root, text="Удалить задачу", command=delete_task)
+button_delete_task.pack()
+
+root.mainloop()
